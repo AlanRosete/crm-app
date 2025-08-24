@@ -4,14 +4,19 @@ import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET!;
 
+function getTokenFromRequest(req: NextRequest) {
+  const cookie = req.cookies.get('token');
+  if (cookie?.value) return cookie.value;
+
+  const auth = req.headers.get('authorization');
+  if (auth?.startsWith('Bearer ')) return auth.split(' ')[1];
+
+  return null;
+}
+
 function verifyToken(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.split(' ')[1];
-
+  const token = getTokenFromRequest(req);
+  if (!token) return null;
   try {
     return jwt.verify(token, SECRET_KEY) as { userId: string };
   } catch {
@@ -21,37 +26,23 @@ function verifyToken(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const user = verifyToken(req);
-  if (!user) {
-    return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
 
-    const tasks = await prisma.task.findMany({
-    where: {
-        client: {
-        userId: user.userId,
-        },
-    },
-    });
+  const tasks = await prisma.task.findMany({
+    where: { client: { userId: user.userId } },
+  });
 
   return NextResponse.json(tasks);
 }
 
 export async function POST(req: NextRequest) {
   const user = verifyToken(req);
-  if (!user) {
-    return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
 
-  const body = await req.json();
-    const { title, description, clientId } = body;
-
-    const task = await prisma.task.create({
-    data: {
-        title,
-        description,
-        clientId,
-    },
-    });
+  const { title, description, clientId } = await req.json();
+  const task = await prisma.task.create({
+    data: { title, description, clientId },
+  });
 
   return NextResponse.json(task, { status: 201 });
 }

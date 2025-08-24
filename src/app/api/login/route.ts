@@ -28,5 +28,18 @@ export async function POST(request: Request) {
     { expiresIn: '1h' }
   );
 
-  return NextResponse.json({ message: 'Login exitoso', token });
+  const res = NextResponse.json(
+    { message: 'Login exitoso', user: { id: user.id, email: user.email } },
+    { status: 200 }
+  );
+
+  res.cookies.set('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production' ? true : false,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60,
+  });
+
+  return res;
 }

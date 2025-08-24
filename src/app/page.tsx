@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import Swal from 'sweetalert2';
 import { useRouter } from 'next/navigation';
 import eyeViewPassword from '../../images/ojo.png';
@@ -12,83 +12,55 @@ export default function LoginGlass() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [token, setToken] = useState<string | null>(null);
+  const [tokenCookie, setTokenCookie] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    if (savedToken) setToken(savedToken);
-  }, []);
+  const validate = useCallback(() => {
+    const e: typeof errors = {};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Introduce un email válido';
+    if (password.length < 6) e.password = 'La contraseña debe tener al menos 6 caracteres';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }, [email, password]);
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (!validate()) return;
     setLoading(true);
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
-      if (res.ok && data.token) {
-        localStorage.setItem('token', data.token);
-        setToken(data.token);
-        Swal.fire({ icon: 'success', title: '¡Login exitoso!', timer: 1400, showConfirmButton: false });
-      } else {
-        Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Credenciales inválidas' });
-      }
+
+    if (res.ok) {
+      setTokenCookie('cookie-set');
+      router.push('/homePage');
+      Swal.fire({
+        icon: 'success',
+        title: '¡Login exitoso!',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2800,
+        timerProgressBar: true,
+      });
+    } else {
+      Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Credenciales inválidas' });
+    }
+
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Error', text: 'Error en login' });
     } finally {
       setLoading(false);
     }
   };
-
-  function logoutClient() {
-    localStorage.removeItem('token');
-    setToken(null);
-    Swal.fire({
-      title: 'Logout exitoso',
-      text: 'Hasta pronto 👋',
-      icon: 'success',
-      timer: 1200,
-      showConfirmButton: false,
-    });
-  }
-
-  if (token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-6">
-        <div className="w-full max-w-3xl">
-          <div className="flex justify-end mb-6">
-            <button
-              onClick={logoutClient}
-              className="rounded-full px-4 py-2 text-sm font-medium bg-white/10 border border-white/20 backdrop-blur-md hover:bg-white/20 transition"
-            >
-              Logout
-            </button>
-          </div>
-
-          <section className="glass-card p-6 rounded-2xl shadow-xl">
-            <h1 className="text-3xl font-semibold mb-2">Bienvenido</h1>
-            <p className="text-sm text-white/80 mb-4">Estás autenticado. Aquí iría la lista de clientes o el dashboard.</p>
-          </section>
-        </div>
-
-        <style jsx>{`
-          .glass-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-            border: 1px solid rgba(255,255,255,0.06);
-            box-shadow: 0 8px 30px rgba(2,6,23,0.6);
-            backdrop-filter: blur(10px) saturate(140%);
-            -webkit-backdrop-filter: blur(10px) saturate(140%);
-            color: #fff;
-          }
-        `}</style>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-6 select-none">
@@ -124,19 +96,17 @@ export default function LoginGlass() {
                 className="mt-2 w-full px-4 py-3 rounded-lg bg-white/6 border border-white/8 placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 placeholder="••••••••"
                 />
-                <div className='bg-white/5 p-3 mt-2 rounded-lg cursor-pointer hover:bg-white/10 transition' onClick={() => setShowPassword(!showPassword)}>
-                  <Image
-                  src={
-                    showPassword
-                      ? eyeClosePassword
-                      : eyeViewPassword
-                  }
-                  alt="Description of my image"
-                  width={30}
-                  height={30}
-                  />
+                <div className='bg-white/5 p-3 mt-2 rounded-lg cursor-pointer hover:bg-white/10 transition' onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword(!showPassword)}>
+                  <Image src={ showPassword ? eyeClosePassword : eyeViewPassword } alt="Description of my image" width={30} height={30} />
                 </div>
               </div>
+                
+              {errors.password && (
+                <p id="password-error" className="text-xs text-rose-400 mt-1">
+                  {errors.password}
+                </p>
+              )}
+
             </label>
 
             <div className="flex items-center justify-between gap-4">

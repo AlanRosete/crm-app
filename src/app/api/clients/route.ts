@@ -4,20 +4,25 @@ import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET!;
 
-// Función para verificar token y extraer userId
-function verifyToken(req: NextRequest) {
+function getTokenFromRequest(req: NextRequest) {
+  const cookie = req.cookies.get('token');
+  if (cookie?.value) return cookie.value;
+
   const authHeader = req.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  return authHeader.split(' ')[1];
+}
 
-  const token = authHeader.split(' ')[1];
+function verifyToken(req: NextRequest) {
+  const token = getTokenFromRequest(req);
+  if (!token) return null;
   try {
-    return jwt.verify(token, SECRET_KEY) as { userId: string };
-  } catch {
+    return jwt.verify(token, SECRET_KEY) as { userId: string; email?: string; iat?: number; exp?: number };
+  } catch (err) {
     return null;
   }
 }
 
-// GET /api/clients -> traer clientes del usuario autenticado
 export async function GET(req: NextRequest) {
   const user = verifyToken(req);
   if (!user) {
@@ -37,7 +42,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/clients -> crear nuevo cliente asociado al usuario autenticado
 export async function POST(req: NextRequest) {
   const user = verifyToken(req);
   if (!user) {
